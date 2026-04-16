@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Expense Pro</title>
+    <title>Mariyam's Expense Tracker</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root { --primary-blue: #1a73e8; --bg-gray: #f8f9fa; }
-        body { background-color: var(--bg-gray); font-family: 'Segoe UI', sans-serif; padding-bottom: 40px; }
+        body { background-color: var(--bg-gray); font-family: 'Segoe UI', sans-serif; padding-bottom: 50px; }
         .hero-card { 
             background: linear-gradient(135deg, var(--primary-blue), #0d47a1); 
             color: white; border-radius: 0 0 25px 25px; padding: 40px 20px;
@@ -33,25 +33,27 @@
 <div class="hero-card text-center">
     <p class="small text-uppercase mb-1 opacity-75">Cumulative Expense</p>
     <h1 class="display-4 fw-bold mb-0" id="grandTotal">₹0.00</h1>
-    <p class="small mt-2 mb-0 opacity-75" id="stats">0 Records</p>
+    <p class="small mt-2 mb-0 opacity-75" id="stats">0 Records Total</p>
 </div>
 
 <div class="container" style="max-width: 500px;">
     <div class="content-card mb-4">
+        <h6 class="fw-bold small text-uppercase text-muted mb-3">Add / Edit Entry</h6>
         <div class="row g-2 mb-3">
-            <div class="col-7"><input type="number" id="amtIn" class="form-control" placeholder="Amount ₹"></div>
-            <div class="col-5"><input type="date" id="dateIn" class="form-control"></div>
+            <div class="col-7"><input type="number" id="amtIn" class="form-control shadow-sm" placeholder="Amount ₹"></div>
+            <div class="col-5"><input type="date" id="dateIn" class="form-control shadow-sm"></div>
         </div>
-        <button class="btn btn-primary w-100 fw-bold mb-3" onclick="handleSave()">💾 Save Entry</button>
+        <button class="btn btn-primary w-100 fw-bold mb-4 shadow-sm" onclick="handleSave()">💾 Save Transaction</button>
 
-        <h6 class="fw-bold small text-uppercase text-muted mb-2">Share Statement</h6>
+        <h6 class="fw-bold small text-uppercase text-muted mb-2">Share PDF Statement</h6>
         <div class="d-flex gap-2 mb-2">
             <button class="btn btn-success btn-share flex-grow-1" style="background:#25D366; border:none;" onclick="generatePDF('today')">Today</button>
-            <button class="btn btn-success btn-share flex-grow-1" style="background:#128C7E; border:none;" onclick="generatePDF('all')">All Time</button>
+            <button class="btn btn-success btn-share flex-grow-1" style="background:#128C7E; border:none;" onclick="generatePDF('all')">All History</button>
         </div>
-        <button class="btn btn-outline-secondary w-100 btn-sm" onclick="promptCustomShare()">Select Specific Date</button>
+        <button class="btn btn-outline-secondary w-100 btn-sm mb-3" onclick="promptCustomShare()">Select Specific Date</button>
         
-        <button class="btn btn-link btn-sm text-danger w-100 mt-2" onclick="resetDB()">Clear All Data</button>
+        <hr>
+        <button class="btn btn-link btn-sm text-danger w-100" onclick="resetDB()">Reset All Data</button>
     </div>
 
     <div id="history"></div>
@@ -59,15 +61,16 @@
 
 <script>
     const { jsPDF } = window.jspdf;
-    let transactions = JSON.parse(localStorage.getItem('biz_share_v5')) || [];
+    let transactions = JSON.parse(localStorage.getItem('mariyam_final_db')) || [];
     let editId = null;
 
+    // Set default date
     document.getElementById('dateIn').valueAsDate = new Date();
 
     function handleSave() {
         const a = document.getElementById('amtIn');
         const d = document.getElementById('dateIn');
-        if (!a.value || !d.value) return alert("Missing Info");
+        if (!a.value || !d.value) return alert("Please enter amount and date");
 
         if (editId) {
             const idx = transactions.findIndex(t => t.id === editId);
@@ -83,7 +86,7 @@
 
     function render() {
         transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        localStorage.setItem('biz_share_v5', JSON.stringify(transactions));
+        localStorage.setItem('mariyam_final_db', JSON.stringify(transactions));
         
         const container = document.getElementById('history');
         let total = 0, html = "", lastDate = "";
@@ -91,19 +94,21 @@
         transactions.forEach(t => {
             total += t.amt;
             if (t.date !== lastDate) {
-                html += `<div class="date-group-header">${new Date(t.date).toDateString()}</div>`;
+                const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+                html += `<div class="date-group-header">${new Date(t.date).toLocaleDateString('en-IN', options)}</div>`;
                 lastDate = t.date;
             }
-            html += `<div class="txn-row d-flex justify-content-between">
-                <span class="fw-bold">₹${t.amt.toLocaleString('en-IN')}</span>
+            html += `<div class="txn-row d-flex justify-content-between align-items-center">
+                <span class="fw-bold">₹${t.amt.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
                 <div>
                     <button class="btn-edit me-2" onclick="startEdit(${t.id})">Edit</button>
                     <button class="btn-delete" onclick="remove(${t.id})">Delete</button>
                 </div>
             </div>`;
         });
-        container.innerHTML = html || '<p class="text-center text-muted py-4">No Data</p>';
-        document.getElementById('grandTotal').innerText = `₹${total.toLocaleString('en-IN', {minimumFractionDigits:2})}`;
+
+        container.innerHTML = html || '<p class="text-center text-muted py-5">No Transactions Found</p>';
+        document.getElementById('grandTotal').innerText = `₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
         document.getElementById('stats').innerText = `${transactions.length} Records Total`;
     }
 
@@ -112,11 +117,22 @@
         document.getElementById('amtIn').value = t.amt;
         document.getElementById('dateIn').value = t.date;
         editId = id;
-        window.scrollTo(0,0);
+        window.scrollTo({top: 0, behavior: 'smooth'});
     }
 
-    function remove(id) { if(confirm("Delete?")) { transactions = transactions.filter(x => x.id !== id); render(); } }
-    function resetDB() { if(confirm("Clear All?")) { transactions = []; render(); } }
+    function remove(id) {
+        if(confirm("Remove this entry?")) {
+            transactions = transactions.filter(x => x.id !== id);
+            render();
+        }
+    }
+
+    function resetDB() {
+        if(confirm("Clear everything? This cannot be undone.")) {
+            transactions = [];
+            render();
+        }
+    }
 
     function promptCustomShare() {
         const date = prompt("Enter date to share (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
@@ -127,141 +143,52 @@
         let list = [];
         const todayStr = new Date().toISOString().split('T')[0];
 
-        if (mode === 'today') list = transactions.filter(t => t.date === todayStr);
-        else if (mode === 'custom') list = transactions.filter(t => t.date === customDate);
-        else list = transactions;
+        if (mode === 'today') {
+            list = transactions.filter(t => t.date === todayStr);
+        } else if (mode === 'custom') {
+            list = transactions.filter(t => t.date === customDate);
+        } else {
+            list = transactions;
+        }
 
-        if (list.length === 0) return alert("No transactions found for this selection.");
+        if (list.length === 0) return alert("No transactions found for this date.");
 
         const doc = new jsPDF();
         let sum = 0;
-        doc.setFontSize(18); doc.text(`Statement: ${mode.toUpperCase()}`, 20, 20);
-        doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 28);
+        doc.setFontSize(18);
+        doc.setTextColor(26, 115, 232);
+        doc.text(`Business Statement (${mode.toUpperCase()})`, 20, 20);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 20, 28);
         doc.line(20, 32, 190, 32);
 
         let y = 45;
+        doc.setTextColor(0);
         list.forEach(t => {
+            if (y > 275) { doc.addPage(); y = 20; }
             doc.text(`${t.date}`, 20, y);
             doc.text(`INR ${t.amt.toLocaleString('en-IN')}`, 100, y);
-            sum += t.amt; y += 10;
+            sum += t.amt;
+            y += 10;
         });
 
         doc.line(20, y, 190, y);
-        doc.text(`TOTAL FOR PERIOD: INR ${sum.toLocaleString('en-IN')}`, 20, y + 10);
+        doc.setFontSize(14);
+        doc.text(`TOTAL FOR PERIOD: INR ${sum.toLocaleString('en-IN')}`, 20, y + 12);
         
         const blob = doc.output('blob');
-        const file = new File([blob], "Statement.pdf", { type: "application/pdf" });
-        if (navigator.share) await navigator.share({ files: [file], title: 'Business Report' });
-        else window.open(URL.createObjectURL(blob));
-    }
-
-    render();
-</script>
-</body>
-</html>
-            // Check if we need a new date header
-            if (item.date !== lastDate) {
-                html += `<div class="date-group-header">${formatDate(item.date)}</div>`;
-                lastDate = item.date;
-            }
-
-            html += `
-                <div class="txn-row d-flex justify-content-between align-items-center">
-                    <div><span class="fw-bold">₹${item.amt.toLocaleString('en-IN')}</span></div>
-                    <div>
-                        <button class="btn-edit me-2" onclick="editEntry(${item.id})">Edit</button>
-                        <button class="btn-delete" onclick="deleteEntry(${item.id})">Delete</button>
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = html || '<div class="text-center text-muted py-5">No records found.</div>';
-        grandTotalDisplay.innerText = `₹${grandTotal.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
-        document.getElementById('stats').innerText = `${db.length} Transactions across history`;
-    }
-
-    function formatDate(dateStr) {
-        const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-        return new Date(dateStr).toLocaleDateString('en-IN', options);
-    }
-
-    function editEntry(id) {
-        const item = db.find(t => t.id === id);
-        document.getElementById('amt').value = item.amt;
-        document.getElementById('dt').value = item.date;
-        editingId = id;
-        window.scrollTo(0,0);
-        document.getElementById('amt').focus();
-    }
-
-    function deleteEntry(id) {
-        if(confirm("Remove this entry?")) {
-            db = db.filter(t => t.id !== id);
-            saveAndRender();
+        const file = new File([blob], "Business_Statement.pdf", { type: "application/pdf" });
+        
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Business Report' });
+        } else {
+            window.open(URL.createObjectURL(blob));
         }
     }
 
-    function resetDB() {
-        if(confirm("Delete everything? This cannot be undone.")) {
-            db = [];
-            saveAndRender();
-        }
-    }
-
-    async function sharePDF() {
-        if (db.length === 0) return alert("Nothing to share");
-        const doc = new jsPDF();
-        let sum = 0;
-        doc.setFontSize(18); doc.text("Business Statement", 20, 20);
-        doc.setFontSize(10); doc.text("Organized Date-wise", 20, 28);
-        doc.line(20, 32, 190, 32);
-
-        let y = 45;
-        db.forEach(t => {
-            if (y > 270) { doc.addPage(); y = 20; }
-            doc.text(`${t.date}`, 20, y);
-            doc.text(`INR ${t.amt.toLocaleString('en-IN')}`, 100, y);
-            sum += t.amt; y += 10;
-        });
-
-        doc.line(20, y, 190, y);
-        doc.setFontSize(14); doc.text(`TOTAL: INR ${sum.toLocaleString('en-IN')}`, 20, y+10);
-        
-        const blob = doc.output('blob');
-        const file = new File([blob], "Statement.pdf", { type: "application/pdf" });
-        if (navigator.share) await navigator.share({ files: [file], title: 'Statement' });
-        else window.open(URL.createObjectURL(blob));
-    }
-
-    saveAndRender();
-</script>
-</body>
-</html>
-                <button class="btn btn-sm text-danger" onclick="del(${t.id})">✕</button>
-            </div>`;
-        }).join('') || '<p class="text-center text-muted py-4">No data available</p>';
-        document.getElementById('totalAmt').innerText = `₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
-    }
-
-    function del(id) { db = db.filter(x => x.id !== id); render(); }
-    function clearData() { if(confirm("Reset all?")) { db = []; render(); } }
-
-    async function sharePDF() {
-        if (db.length === 0) return alert("No data");
-        const doc = new jsPDF();
-        let sum = 0;
-        doc.setFontSize(20); doc.text("Business Statement", 20, 20);
-        doc.setFontSize(12); let y = 40;
-        db.forEach(t => {
-            doc.text(`${t.date}  -  INR ${t.amt.toLocaleString('en-IN')}`, 20, y);
-            sum += t.amt; y += 10;
-        });
-        doc.text(`Total: INR ${sum.toLocaleString('en-IN')}`, 20, y + 10);
-        const file = new File([doc.output('blob')], "Statement.pdf", { type: "application/pdf" });
-        if (navigator.share) await navigator.share({ files: [file], title: 'Statement' });
-        else window.open(URL.createObjectURL(file));
-    }
+    // Initial load
     render();
 </script>
 </body>
