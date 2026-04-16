@@ -8,263 +8,121 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body { background: #f4f7f9; font-family: sans-serif; padding-bottom: 50px; }
-        .app-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: #fff; margin-bottom: 20px; }
+        body { background: #f4f7f9; font-family: sans-serif; padding: 15px; }
+        .app-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); background: #fff; margin-bottom: 20px; }
         .btn-sync { background: #1a73e8; color: white; border: none; padding: 18px; border-radius: 12px; font-weight: bold; width: 100%; }
-        .summary-badge { background: #e8f0fe; color: #1a73e8; border-radius: 8px; padding: 10px; text-align: center; }
-        .debug-panel { background: #222; color: #0f0; font-family: monospace; font-size: 0.7rem; padding: 10px; border-radius: 8px; max-height: 150px; overflow-y: auto; display: none; }
-        .table-container { border-radius: 12px; overflow: hidden; }
+        .summary-badge { background: #e8f0fe; color: #1a73e8; border-radius: 8px; padding: 12px; text-align: center; }
+        .table-container { background: white; border-radius: 12px; overflow: hidden; }
+        #status-area { font-size: 0.8rem; text-align: center; margin-top: 10px; color: #666; display: none; }
     </style>
 </head>
 <body>
 
-<div class="container" style="max-width: 600px; padding-top: 20px;">
+<div class="container" style="max-width: 550px;">
     <h3 class="text-center fw-bold mb-4">Expense Tracker Pro</h3>
 
     <div class="card app-card p-4">
         <label class="btn-sync text-center d-block shadow-sm">
-            🔄 SYNC MULTIPLE SCREENSHOTS
+            🔄 SYNC GPAY SCREENSHOTS
             <input type="file" id="multiInput" accept="image/*" multiple hidden>
         </label>
-        
-        <div id="progress-area" class="mt-3" style="display:none;">
-            <div class="progress" style="height: 10px;">
-                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
-            </div>
-            <p id="status-text" class="text-center small mt-2">Initializing...</p>
+        <div id="status-area">
+            <span id="status-text">Processing...</span>
+            <div class="progress mt-2" style="height: 6px;"><div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>
         </div>
     </div>
 
     <div class="row g-2 mb-3">
-        <div class="col-6"><div class="summary-badge shadow-sm"><small>Transactions</small><h4 id="totalCount">0</h4></div></div>
-        <div class="col-6"><div class="summary-badge shadow-sm" style="background:#34a853;color:#fff;"><small>Grand Total</small><h4 id="totalAmount">₹0</h4></div></div>
+        <div class="col-6"><div class="summary-badge">Count: <span id="tCount" class="fw-bold">0</span></div></div>
+        <div class="col-6"><div class="summary-badge" style="background:#34a853; color:white;">Total: <span id="tAmount" class="fw-bold">₹0</span></div></div>
     </div>
 
-    <div class="d-flex gap-2 mb-3">
-        <button class="btn btn-dark w-100 fw-bold" onclick="sharePDF()">📤 SHARE STATEMENT</button>
-        <button class="btn btn-outline-secondary btn-sm" onclick="toggleDebug()">Debug</button>
+    <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-dark w-100 fw-bold py-2" onclick="sharePDF()">📤 SHARE WHATSAPP</button>
+        <button class="btn btn-outline-danger btn-sm" onclick="clearData()">Reset</button>
     </div>
 
-    <div class="card app-card p-0 overflow-hidden shadow-sm">
-        <div class="table-container">
-            <table class="table table-hover mb-0">
-                <thead class="table-light"><tr><th>Date</th><th>Amount</th><th>Action</th></tr></thead>
-                <tbody id="dataTable"></tbody>
-            </table>
-        </div>
+    <div class="table-container shadow-sm">
+        <table class="table table-hover mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light"><tr><th>Date</th><th>Amount</th><th class="text-end">Action</th></tr></thead>
+            <tbody id="dataTable"></tbody>
+        </table>
     </div>
-
-    <div id="debug-panel" class="debug-panel mt-3">--- Scanner Debug Logs ---<br></div>
-    <button class="btn btn-link btn-sm text-muted w-100 mt-2" onclick="clearAll()">Reset All Data</button>
 </div>
 
 <script>
     const { jsPDF } = window.jspdf;
-    let transactions = JSON.parse(localStorage.getItem('expense_v6')) || [];
-
-    const logger = (msg) => {
-        const panel = document.getElementById('debug-panel');
-        panel.innerHTML += `> ${msg}<br>`;
-        panel.scrollTop = panel.scrollHeight;
-    };
+    let transactions = JSON.parse(localStorage.getItem('et_v7')) || [];
 
     document.getElementById('multiInput').onchange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        document.getElementById('progress-area').style.display = 'block';
-        let count = 0;
+        document.getElementById('status-area').style.display = 'block';
+        let processed = 0;
 
         for (let file of files) {
-            count++;
-            document.getElementById('status-text').innerText = `Scanning Image ${count}/${files.length}...`;
-            document.getElementById('progress-bar').style.width = (count/files.length*100) + '%';
+            processed++;
+            document.getElementById('status-text').innerText = `Scanning Image ${processed}/${files.length}`;
+            document.getElementById('progress-bar').style.width = (processed/files.length*100) + '%';
             
             try {
                 const result = await Tesseract.recognize(file, 'eng');
                 const text = result.data.text;
-                logger(`Image ${count} Scanned.`);
 
-                // Logic to find all amounts in a list (e.g. + ₹200 or 1,39,720)
-                const pattern = /(?:\+|\₹|Rs\.?|INR)?\s?([\d,]+\.\d{2}|[\d,]{2,})/g;
+                // This pattern finds numbers like 200, 1,39,720, or ₹560
+                const pattern = /(?:\₹|Rs\.?|INR)?\s?([\d,]+\.\d{2}|[\d,]{2,})/g;
                 let match;
-                let foundInThisImage = 0;
 
                 while ((match = pattern.exec(text)) !== null) {
-                    let rawAmt = match[1].replace(/,/g, '');
-                    let cleanedAmt = parseFloat(rawAmt);
-
-                    // Ignore time (10:22) or year (2026)
+                    let cleanedAmt = parseFloat(match[1].replace(/,/g, ''));
+                    // Filters out years (2026) and times (10:49)
                     if (!isNaN(cleanedAmt) && cleanedAmt > 10 && cleanedAmt !== 2026) {
                         transactions.push({
                             id: Date.now() + Math.random(),
                             amount: cleanedAmt,
                             date: new Date().toLocaleDateString('en-IN')
                         });
-                        foundInThisImage++;
                     }
                 }
-                logger(`Found ${foundInThisImage} entries in Image ${count}`);
-            } catch (err) {
-                logger(`Error: ${err.message}`);
-            }
+            } catch (err) { console.error(err); }
         }
+        
         saveAndRender();
-        document.getElementById('progress-area').style.display = 'none';
+        document.getElementById('status-area').style.display = 'none';
         e.target.value = '';
     };
 
     function saveAndRender() {
-        localStorage.setItem('expense_v6', JSON.stringify(transactions));
+        localStorage.setItem('et_v7', JSON.stringify(transactions));
         const table = document.getElementById('dataTable');
         let sum = 0;
-        
+
         table.innerHTML = transactions.map(t => {
             sum += t.amount;
-            return `<tr><td><small>${t.date}</small></td><td><strong>₹${t.amount.toLocaleString('en-IN')}</strong></td><td><button class="btn btn-sm text-danger" onclick="remove(${t.id})">✕</button></td></tr>`;
-        }).join('') || '<tr><td colspan="3" class="text-center p-4 text-muted">No data found. Sync screenshots.</td></tr>';
+            return `<tr><td>${t.date}</td><td class="fw-bold">₹${t.amount.toLocaleString('en-IN')}</td><td class="text-end"><button class="btn btn-sm text-danger" onclick="remove(${t.id})">✕</button></td></tr>`;
+        }).join('') || '<tr><td colspan="3" class="text-center p-4">No data. Sync screenshots.</td></tr>';
 
-        document.getElementById('totalCount').innerText = transactions.length;
-        document.getElementById('totalAmount').innerText = `₹${sum.toLocaleString('en-IN')}`;
+        document.getElementById('tCount').innerText = transactions.length;
+        document.getElementById('tAmount').innerText = `₹${sum.toLocaleString('en-IN')}`;
     }
 
     function remove(id) { transactions = transactions.filter(t => t.id != id); saveAndRender(); }
-    function clearAll() { if(confirm("Clear all?")) { transactions = []; saveAndRender(); } }
-    function toggleDebug() { 
-        const p = document.getElementById('debug-panel');
-        p.style.display = p.style.display === 'none' ? 'block' : 'none';
-    }
+    function clearData() { if(confirm("Clear everything?")) { transactions = []; saveAndRender(); } }
 
     async function sharePDF() {
         if (transactions.length === 0) return alert("Nothing to share.");
         const doc = new jsPDF();
         let sum = 0;
-        doc.setFontSize(18);
-        doc.text("Expense Tracker Statement", 20, 20);
+        doc.text("Expense Tracker Pro Statement", 20, 20);
         doc.setFontSize(10);
-        doc.text(`Total Records: ${transactions.length}`, 20, 28);
-        doc.line(20, 32, 190, 32);
-
-        doc.text("Date", 20, 40);
-        doc.text("Amount (INR)", 100, 40);
-        doc.line(20, 42, 190, 42);
-
-        let y = 50;
-        transactions.forEach(t => {
-            if (y > 270) { doc.addPage(); y = 20; }
-            doc.text(`${t.date}`, 20, y);
-            doc.text(`${t.amount.toLocaleString('en-IN')}`, 100, y);
-            sum += t.amount;
-            y += 10;
-        });
-        doc.line(20, y, 190, y);
-        doc.setFontSize(14);
-        doc.text(`GRAND TOTAL: INR ${sum.toLocaleString('en-IN')}`, 20, y+10);
-        
-        const file = new File([doc.output('blob')], "Statement.pdf", { type: "application/pdf" });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'My Statement' });
-        } else {
-            window.open(URL.createObjectURL(file), '_blank');
-        }
-    }
-    saveAndRender();
-</script>
-</body>
-</html>
-            try {
-                const result = await Tesseract.recognize(file, 'eng');
-                const text = result.data.text;
-                
-                // Extract Amount
-                const amtMatch = text.match(/(?:₹|Rs\.?|INR)\s?([\d,]+(?:\.\d{2})?)/i);
-                // Extract Date
-                const dateRegex = /(\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s\d{2,4})|(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
-                const dateMatch = text.match(dateRegex);
-
-                if (amtMatch) {
-                    transactions.unshift({
-                        id: Date.now() + Math.random(),
-                        amount: parseFloat(amtMatch[1].replace(/,/g, '')),
-                        date: dateMatch ? dateMatch[0] : new Date().toLocaleDateString('en-IN')
-                    });
-                }
-            } catch (err) { console.error("OCR Error", err); }
-        }
-
-        saveAndRender();
-        statusBox.style.display = 'none';
-        e.target.value = '';
-    };
-
-    function addManual() {
-        const amt = document.getElementById('manualAmt').value;
-        const date = document.getElementById('manualDate').value;
-        if (!amt || !date) return alert("Fill all fields");
-
-        transactions.unshift({ id: Date.now(), amount: parseFloat(amt), date: date });
-        saveAndRender();
-        document.getElementById('manualAmt').value = '';
-    }
-
-    function saveAndRender() {
-        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        localStorage.setItem('expense_v4', JSON.stringify(transactions));
-        
-        const table = document.getElementById('dataTable');
-        const totalCount = document.getElementById('totalCount');
-        const totalAmount = document.getElementById('totalAmount');
-        
-        let sum = 0;
-        table.innerHTML = transactions.map(t => {
-            sum += t.amount;
-            return `
-                <tr>
-                    <td class="text-muted">${t.date}</td>
-                    <td class="fw-bold">₹${t.amount.toLocaleString('en-IN')}</td>
-                    <td class="text-end"><button class="btn btn-sm text-danger" onclick="removeEntry(${t.id})">✕</button></td>
-                </tr>
-            `;
-        }).join('') || '<tr><td colspan="3" class="text-center p-4 text-muted">No data. Sync screenshots to begin.</td></tr>';
-
-        totalCount.innerText = transactions.length;
-        totalAmount.innerText = `₹${sum.toLocaleString('en-IN')}`;
-    }
-
-    function removeEntry(id) {
-        transactions = transactions.filter(t => t.id != id);
-        saveAndRender();
-    }
-
-    function clearAll() {
-        if (confirm("Delete all data?")) { transactions = []; saveAndRender(); }
-    }
-
-    // --- WHATSAPP SHARING & PDF ---
-    async function sharePDF() {
-        if (transactions.length === 0) return alert("No data to share.");
-        
-        const doc = new jsPDF();
-        let sum = 0;
-
-        doc.setFontSize(18);
-        doc.setTextColor(26, 115, 232);
-        doc.text("Expense Tracker Statement", 20, 20);
-        doc.setFontSize(10);
-        doc.setTextColor(100);
         doc.text(`Total Transactions: ${transactions.length}`, 20, 28);
         doc.line(20, 32, 190, 32);
-
-        doc.setTextColor(0);
-        doc.text("Date", 20, 38);
-        doc.text("Amount (INR)", 100, 38);
-        doc.line(20, 40, 190, 40);
-
-        let y = 48;
+        
+        let y = 45;
         transactions.forEach(t => {
-            if (y > 270) { doc.addPage(); y = 20; }
             doc.text(`${t.date}`, 20, y);
-            doc.text(`${t.amount.toLocaleString('en-IN')}`, 100, y);
+            doc.text(`INR ${t.amount.toLocaleString('en-IN')}`, 100, y);
             sum += t.amount;
             y += 10;
         });
@@ -277,10 +135,9 @@
         const file = new File([pdfBlob], "Statement.pdf", { type: "application/pdf" });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'Statement', text: 'My GPay Expense Report' });
+            await navigator.share({ files: [file], title: 'Statement' });
         } else {
-            const url = URL.createObjectURL(pdfBlob);
-            window.open(url, '_blank');
+            window.open(URL.createObjectURL(pdfBlob), '_blank');
         }
     }
 
@@ -288,9 +145,3 @@
 </script>
 </body>
 </html>
-
-    render();
-</script>
-</body>
-</html>
-
