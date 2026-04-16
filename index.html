@@ -3,148 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Tracker</title>
+    <title>Expense Tracker Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        body { background: #f0f2f5; font-family: sans-serif; padding: 15px; }
-        .app-card { border-radius: 15px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: white; }
-        .total-box { background: #1a73e8; color: white; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px; }
-        .btn-share { background: #25D366; color: white; border: none; font-weight: bold; }
-        .btn-share:hover { background: #128C7E; color: white; }
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        body { background: #f4f7f9; font-family: 'Segoe UI', sans-serif; padding-bottom: 50px; }
+        .app-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: #fff; margin-bottom: 20px; }
+        .btn-sync { background: #1a73e8; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; width: 100%; transition: 0.3s; }
+        .btn-sync:hover { background: #1557b0; }
+        .summary-badge { background: #e8f0fe; color: #1a73e8; border-radius: 8px; padding: 10px; text-align: center; }
+        .table-container { border-radius: 10px; overflow: hidden; border: 1px solid #eee; }
+        #status-box { font-size: 0.85rem; color: #666; margin-top: 10px; text-align: center; display: none; }
+        .progress { height: 8px; border-radius: 10px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container" style="max-width: 500px;">
-    <h3 class="text-center fw-bold mb-4">Expense Tracker</h3>
+<div class="container" style="max-width: 600px; padding-top: 20px;">
+    <h3 class="text-center fw-bold mb-4 text-primary">Expense Tracker Pro</h3>
 
-    <div class="total-box">
-        <small>Total Balance</small>
-        <h2 class="fw-bold mb-0" id="totalDisplay">₹0.00</h2>
-    </div>
-
-    <div class="card app-card p-4 mb-3">
-        <div class="row g-2">
-            <div class="col-7">
-                <label class="small fw-bold">Amount (₹)</label>
-                <input type="number" id="amt" class="form-control" placeholder="0.00">
-            </div>
-            <div class="col-5">
-                <label class="small fw-bold">Date</label>
-                <input type="date" id="txnDate" class="form-control">
+    <div class="card app-card p-4">
+        <label class="btn-sync text-center d-block">
+            🔄 SYNC MULTIPLE SCREENSHOTS
+            <input type="file" id="multiInput" accept="image/*" multiple hidden>
+        </label>
+        
+        <div id="status-box">
+            <div id="status-text">Processing images...</div>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
             </div>
         </div>
-        <button class="btn btn-primary w-100 mt-3 py-2 fw-bold" onclick="addEntry()">➕ Add Entry</button>
+        
+        <hr class="my-4">
+        
+        <div class="row g-2">
+            <div class="col-7">
+                <label class="small fw-bold">Manual Amount (₹)</label>
+                <input type="number" id="manualAmt" class="form-control" placeholder="0.00">
+            </div>
+            <div class="col-5">
+                <label class="small fw-bold">Manual Date</label>
+                <input type="date" id="manualDate" class="form-control">
+            </div>
+        </div>
+        <button class="btn btn-outline-primary w-100 mt-2 btn-sm" onclick="addManual()">+ Add Manually</button>
     </div>
 
-    <div class="d-grid gap-2 mb-4">
-        <button class="btn btn-share py-3" onclick="sharePDF()">📤 Share Statement to WhatsApp</button>
-        <button class="btn btn-outline-danger btn-sm" onclick="clearAll()">Reset All Data</button>
+    <div class="row g-2 mb-3">
+        <div class="col-6">
+            <div class="summary-badge shadow-sm">
+                <small class="d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Transactions</small>
+                <h4 class="mb-0 fw-bold" id="totalCount">0</h4>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="summary-badge shadow-sm" style="background: #34a853; color: white;">
+                <small class="d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Total Amount</small>
+                <h4 class="mb-0 fw-bold" id="totalAmount">₹0</h4>
+            </div>
+        </div>
     </div>
 
-    <div class="card app-card overflow-hidden">
-        <div id="displayList"></div>
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-dark w-100 fw-bold py-2" onclick="sharePDF()">📤 SHARE STATEMENT</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAll()">RESET</button>
+    </div>
+
+    <div class="table-container shadow-sm bg-white">
+        <table class="table table-hover mb-0" style="font-size: 0.9rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody id="dataTable">
+                </tbody>
+        </table>
     </div>
 </div>
 
 <script>
     const { jsPDF } = window.jspdf;
-    let transactions = JSON.parse(localStorage.getItem('et_data')) || [];
+    let transactions = JSON.parse(localStorage.getItem('expense_v4')) || [];
+    document.getElementById('manualDate').valueAsDate = new Date();
 
-    document.getElementById('txnDate').valueAsDate = new Date();
+    // --- MULTI-SCREENSHOT OCR ENGINE ---
+    document.getElementById('multiInput').onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
-    function addEntry() {
-        const amt = document.getElementById('amt').value;
-        const date = document.getElementById('txnDate').value;
-        if (!amt || !date) return alert("Enter amount and date");
+        const statusBox = document.getElementById('status-box');
+        const progressBar = document.getElementById('progress-bar');
+        const statusText = document.getElementById('status-text');
+        
+        statusBox.style.display = 'block';
+        let count = 0;
+
+        for (let file of files) {
+            count++;
+            statusText.innerText = `Scanning image ${count} of ${files.length}...`;
+            progressBar.style.width = (count / files.length * 100) + '%';
+            
+            try {
+                const result = await Tesseract.recognize(file, 'eng');
+                const text = result.data.text;
+                
+                // Extract Amount
+                const amtMatch = text.match(/(?:₹|Rs\.?|INR)\s?([\d,]+(?:\.\d{2})?)/i);
+                // Extract Date
+                const dateRegex = /(\d{1,2}\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s\d{2,4})|(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i;
+                const dateMatch = text.match(dateRegex);
+
+                if (amtMatch) {
+                    transactions.unshift({
+                        id: Date.now() + Math.random(),
+                        amount: parseFloat(amtMatch[1].replace(/,/g, '')),
+                        date: dateMatch ? dateMatch[0] : new Date().toLocaleDateString('en-IN')
+                    });
+                }
+            } catch (err) { console.error("OCR Error", err); }
+        }
+
+        saveAndRender();
+        statusBox.style.display = 'none';
+        e.target.value = '';
+    };
+
+    function addManual() {
+        const amt = document.getElementById('manualAmt').value;
+        const date = document.getElementById('manualDate').value;
+        if (!amt || !date) return alert("Fill all fields");
 
         transactions.unshift({ id: Date.now(), amount: parseFloat(amt), date: date });
+        saveAndRender();
+        document.getElementById('manualAmt').value = '';
+    }
+
+    function saveAndRender() {
         transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        localStorage.setItem('et_data', JSON.stringify(transactions));
-        document.getElementById('amt').value = '';
-        render();
-    }
-
-    function render() {
-        const list = document.getElementById('displayList');
-        const totalDisplay = document.getElementById('totalDisplay');
-        let total = 0;
-
-        list.innerHTML = transactions.map(item => {
-            total += item.amount;
+        localStorage.setItem('expense_v4', JSON.stringify(transactions));
+        
+        const table = document.getElementById('dataTable');
+        const totalCount = document.getElementById('totalCount');
+        const totalAmount = document.getElementById('totalAmount');
+        
+        let sum = 0;
+        table.innerHTML = transactions.map(t => {
+            sum += t.amount;
             return `
-                <div class="list-item">
-                    <div>
-                        <strong>₹${item.amount.toLocaleString('en-IN')}</strong><br>
-                        <small class="text-muted">${item.date}</small>
-                    </div>
-                    <button class="btn btn-sm text-danger" onclick="deleteItem(${item.id})">✕</button>
-                </div>
+                <tr>
+                    <td class="text-muted">${t.date}</td>
+                    <td class="fw-bold">₹${t.amount.toLocaleString('en-IN')}</td>
+                    <td class="text-end"><button class="btn btn-sm text-danger" onclick="removeEntry(${t.id})">✕</button></td>
+                </tr>
             `;
-        }).join('') || '<p class="p-4 text-center text-muted">No records</p>';
+        }).join('') || '<tr><td colspan="3" class="text-center p-4 text-muted">No data. Sync screenshots to begin.</td></tr>';
 
-        totalDisplay.innerText = `₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+        totalCount.innerText = transactions.length;
+        totalAmount.innerText = `₹${sum.toLocaleString('en-IN')}`;
     }
 
-    function deleteItem(id) {
-        transactions = transactions.filter(i => i.id !== id);
-        localStorage.setItem('et_data', JSON.stringify(transactions));
-        render();
+    function removeEntry(id) {
+        transactions = transactions.filter(t => t.id != id);
+        saveAndRender();
     }
 
     function clearAll() {
-        if(confirm("Clear all?")) { transactions = []; localStorage.setItem('et_data', JSON.stringify(transactions)); render(); }
+        if (confirm("Delete all data?")) { transactions = []; saveAndRender(); }
     }
 
+    // --- WHATSAPP SHARING & PDF ---
     async function sharePDF() {
         if (transactions.length === 0) return alert("No data to share.");
         
         const doc = new jsPDF();
-        let total = 0;
+        let sum = 0;
+
+        doc.setFontSize(18);
+        doc.setTextColor(26, 115, 232);
         doc.text("Expense Tracker Statement", 20, 20);
         doc.setFontSize(10);
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 28);
+        doc.setTextColor(100);
+        doc.text(`Total Transactions: ${transactions.length}`, 20, 28);
         doc.line(20, 32, 190, 32);
 
-        let y = 45;
+        doc.setTextColor(0);
+        doc.text("Date", 20, 38);
+        doc.text("Amount (INR)", 100, 38);
+        doc.line(20, 40, 190, 40);
+
+        let y = 48;
         transactions.forEach(t => {
+            if (y > 270) { doc.addPage(); y = 20; }
             doc.text(`${t.date}`, 20, y);
-            doc.text(`INR ${t.amount.toFixed(2)}`, 100, y);
-            total += t.amount;
+            doc.text(`${t.amount.toLocaleString('en-IN')}`, 100, y);
+            sum += t.amount;
             y += 10;
         });
 
         doc.line(20, y, 190, y);
         doc.setFontSize(14);
-        doc.text(`Total Sum: INR ${total.toLocaleString('en-IN')}`, 20, y + 10);
+        doc.text(`GRAND TOTAL: INR ${sum.toLocaleString('en-IN')}`, 20, y + 10);
 
         const pdfBlob = doc.output('blob');
         const file = new File([pdfBlob], "Statement.pdf", { type: "application/pdf" });
 
-        // Check if browser supports sharing files (WhatsApp Sharing)
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({
-                    files: [file],
-                    title: 'Expense Statement',
-                    text: 'Here is my transaction statement.'
-                });
-            } catch (err) {
-                // Fallback for local files
-                const url = URL.createObjectURL(pdfBlob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "Statement.pdf";
-                a.click();
-            }
+            await navigator.share({ files: [file], title: 'Statement', text: 'My GPay Expense Report' });
         } else {
-            // Standard download fallback
             const url = URL.createObjectURL(pdfBlob);
             window.open(url, '_blank');
         }
     }
+
+    saveAndRender();
+</script>
+</body>
+</html>
 
     render();
 </script>
